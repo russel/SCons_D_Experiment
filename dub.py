@@ -80,32 +80,48 @@ class _Library(SCons.Node.FS.File):
         if len(selected_versions) == 0:
             compile_library()
             selected_versions = collect_library_versions()
+            if len(selected_versions) == 0:
+                raise SCons.Errors.StopError('Cannot compile {} for {}.'.format(name, compiler))
         if len(selected_versions) > 1:
             raise SCons.Errors.StopError('Multiple compiled library versions found, this cannot happen.')
+        path_to_library = os.path.join(build_directory, selected_versions[0], 'lib' + name + '.a')
+        if not os.path.isfile(path_to_library):
+            compile_library()
+            if not os.path.isfile(path_to_library):
+                raise SCons.Errors.StopError('The library file {} is not there.'.format(path_to_library))
+        env.Precious(path_to_library)
+        env.NoClean(path_to_library)
 
         if name == 'unit-threaded':
-            if not os.path.isfile(os.path.join(self.directory, 'gen_ut_main')):
-                print('Recreating gen_ut_main.')
-                process = subprocess.Popen('dub build --build=release --compiler={} --config=gen_ut_main'.format(self.compiler), shell=True, stderr=subprocess.PIPE, cwd=self.directory)
-                rc = process.wait()
-                if rc != 0:
-                    print('dub build returned error code', rc)
-                    stderr = process.stderr.read()
-                    if 'Skipping execution' not in stderr:
-                        raise SCons.Errors.StopError('Something truly weird happened. ' + stderr)
 
-            def unit_threaded_make_main(destination, directory=self.directory, env=self.env):
-                gen_ut_main = os.path.join(directory, 'gen_ut_main')
-                assert os.path.isfile(gen_ut_main), 'get_ut_main not found.'
-                rc = subprocess.call([gen_ut_main, '-f', destination])
-                if rc != 0:
-                    SCons.Errors.StopError('Failed to make ' + destination)
-                return env.File(destination)
+            def reassign_target(target, source, env):
+                if len(target) != 1:
+                    SCons.Errors.StopError('Incorrect number of targets.')
+                if len(source) != 1:
+                    SCons.Errors.StopError('Incorrect number of sources')
+                return [env.File(source[0].name)], [source[0].dir.srcnode()]
 
-            setattr(self, 'UnitThreadedMakeMain', unit_threaded_make_main)
+            def make_main(target, source, env):
+                if len(target) != 1:
+                    SCons.Errors.StopError('Incorrect number of targets.')
+                if len(source) != 0:
+                    SCons.Errors.StopError('Incorrect number of sources')
+                modules = tuple(f for f in os.listdir(str(source[0])) if f.endswith('.d'))
+                opening = """//Automatically generated do not edit by hand.
+import unit_threaded;
+int main(string[] args) {
+    return args.runTests!(
+"""
+                closing = """    );
+}
+"""
+                with open(str(target[0]), 'w') as f:
+                    f.write(opening + ''.join(tuple('"{}",\n'.format(m.replace('.d', '')) for m in modules)) + closing)
+
+            env['BUILDERS']['UnitThreadedMakeMain'] = SCons.Builder.Builder(action=make_main, emitter=reassign_target, single_source=True)
 
         compiled_library_directory = os.path.join(build_directory, selected_versions[0])
-        self.library_file = os.path.join(compiled_library_directory, 'libunit-threaded.a')
+        self.library_file = os.path.join(compiled_library_directory, 'lib' + name + '.a')
         env.Append(DPATH=os.path.join(self.directory, 'source'))
         env.Append(LIBPATH=compiled_library_directory)
         env.Append(LIBS=name)
@@ -120,7 +136,7 @@ def _do_nothing(target, source, env):
 
 
 def _do_nothing_print_message(*args):
-    pass
+    pass  # print(args)
 
 
 def _ensure_library_present_and_amend_target_path(target, source, env):
@@ -129,11 +145,10 @@ def _ensure_library_present_and_amend_target_path(target, source, env):
     if len(source) != 1:
         SCons.Errors.StopError('Incorrect number of sources')
     library =  _Library(env,  target[0].name, source[0].value)
-    env.Precious(library.library_file)
     if 'library_' + library.key_name in env:
-        print('Library already found')
-        return [], []
-    env['LIBRARIES'][library.key_name] = library
+        print('Library {} already found'.format(library.key_name))
+    else:
+        env['LIBRARIES'][library.key_name] = library
     return [env.File(library.library_file)], []
 
 
