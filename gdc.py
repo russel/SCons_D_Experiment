@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 """SCons.Tool.gdc
 
 Tool-specific initialization for the GDC compiler.
@@ -52,7 +54,7 @@ import SCons.Action
 import SCons.Defaults
 import SCons.Tool
 
-import SCons.Tool.DCommon
+import DCommon
 
 
 def generate(env):
@@ -79,7 +81,7 @@ def generate(env):
     env['DDEBUG'] = []
 
     if env['DC']:
-        SCons.Tool.DCommon.addDPATHToEnv(env, env['DC'])
+        DCommon.addDPATHToEnv(env, env['DC'])
 
     env['DINCPREFIX'] = '-I'
     env['DINCSUFFIX'] = ''
@@ -130,11 +132,13 @@ def generate(env):
 
     env['BUILDERS']['ProgramAllAtOnce'] = SCons.Builder.Builder(
         action='$DC $_DINCFLAGS $_DVERFLAGS $_DDEBUGFLAGS $_DFLAGS -o $TARGET $DLINKFLAGS $__DRPATH $SOURCES $_DLIBDIRFLAGS $_DLIBFLAGS',
+        emitter=DCommon.allAtOnceEmitter,
     )
 
 
 def exists(env):
     return env.Detect('gdc')
+
 
 # Local Variables:
 # tab-width:4
