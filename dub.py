@@ -36,7 +36,9 @@ __revision__ = "__FILE__ __REVISION__ __DATE__ __DEVELOPER__"
 import os
 import subprocess
 
-import SCons.Builder, SCons.Node, SCons.Errors
+import SCons.Builder
+import SCons.Node
+import SCons.Errors
 
 
 class _Library(SCons.Node.FS.File):
@@ -61,11 +63,11 @@ class _Library(SCons.Node.FS.File):
                     raise SCons.Errors.StopError('Something weird happened. ' + stderr)
 
         def collect_library_versions():
-            return  [f for f in os.listdir(build_directory) if f.startswith('library-release-linux.posix-x86_64-' + ('ldc' if self.compiler == 'ldc2' else self.compiler))]
+            return [f for f in os.listdir(build_directory) if f.startswith('library-debug-linux.posix-x86_64-' + ('ldc' if self.compiler == 'ldc2' else self.compiler))]
 
         def compile_library():
             print('Compiling fetched', name)
-            process = subprocess.Popen('dub build --build=release --compiler={}'.format(self.compiler), shell=True, stderr=subprocess.PIPE, cwd=self.directory)
+            process = subprocess.Popen('dub build --build=debug --compiler={}'.format(self.compiler), shell=True, stderr=subprocess.PIPE, cwd=self.directory)
             rc = process.wait()
             if rc != 0:
                 print('dub build returned error code', rc)
@@ -118,7 +120,12 @@ int main(string[] args) {
                 with open(str(target[0]), 'w') as f:
                     f.write(opening + ''.join(tuple('"{}",\n'.format(m.replace('.d', '')) for m in modules)) + closing)
 
-            env['BUILDERS']['UnitThreadedMakeMain'] = SCons.Builder.Builder(action=make_main, emitter=reassign_target, single_source=True)
+            env['BUILDERS']['UnitThreadedMakeMain'] = SCons.Builder.Builder(
+                action=make_main,
+                emitter=reassign_target,
+                single_source=True,
+                PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
+            )
 
         compiled_library_directory = os.path.join(build_directory, selected_versions[0])
         self.library_file = os.path.join(compiled_library_directory, 'lib' + name + '.a')
@@ -144,7 +151,7 @@ def _ensure_library_present_and_amend_target_path(target, source, env):
         SCons.Errors.StopError('Incorrect number of targets.')
     if len(source) != 1:
         SCons.Errors.StopError('Incorrect number of sources')
-    library =  _Library(env,  target[0].name, source[0].value)
+    library = _Library(env, target[0].name, source[0].value)
     if 'library_' + library.key_name in env:
         print('Library {} already found'.format(library.key_name))
     else:
