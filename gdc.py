@@ -77,7 +77,7 @@ def generate(env):
     env['_DINCFLAGS'] = '${_concat(DINCPREFIX, DPATH, DINCSUFFIX, __env__, RDirs, TARGET, SOURCE)}'
     env['_DVERFLAGS'] = '${_concat(DVERPREFIX, DVERSIONS, DVERSUFFIX, __env__)}'
     env['_DDEBUGFLAGS'] = '${_concat(DDEBUGPREFIX, DDEBUG, DDEBUGSUFFIX, __env__)}'
-    env['_DINTFDIR'] = '${_concat(DINTFDIRPREFIX, DINTFDIR, DINTFDIRSUFFIX, __env__, RDirs)}'
+    env['_DINTFDIR'] = '${_concat(DINTFDIRPREFIX, DINTFDIR, DINTFDIRSUFFIX, __env__, Dirs)}'
     env['_DFLAGS'] = '${_concat(DFLAGPREFIX, DFLAGS, DFLAGSUFFIX, __env__)}'
 
     env['SHDC'] = '$DC'
