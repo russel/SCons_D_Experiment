@@ -53,8 +53,15 @@ __revision__ = "__FILE__ __REVISION__ __DATE__ __DEVELOPER__"
 import SCons.Action
 import SCons.Defaults
 import SCons.Tool
-
+import os.path
 import DCommon
+
+def DStaticObjectEmitter(target,source,env):
+    target,source = SCons.Defaults.StaticObjectEmitter(target,source,env)
+    if "DINTFDIR" in env:
+        for s in source:
+            target.append(env["DINTFDIR"][0] + "/" + os.path.split(str(s))[1][:-2] + ".di")
+    return (target,source)
 
 
 def generate(env):
@@ -62,14 +69,15 @@ def generate(env):
 
     static_obj.add_action('.d', SCons.Defaults.DAction)
     shared_obj.add_action('.d', SCons.Defaults.ShDAction)
-    static_obj.add_emitter('.d', SCons.Defaults.StaticObjectEmitter)
+    static_obj.add_emitter('.d', DStaticObjectEmitter)
     shared_obj.add_emitter('.d', SCons.Defaults.SharedObjectEmitter)
 
     env['DC'] = env.Detect('gdc')
-    env['DCOM'] = '$DC $_DINCFLAGS $_DVERFLAGS $_DDEBUGFLAGS $_DFLAGS -c -o $TARGET $SOURCES'
+    env['DCOM'] = '$DC $_DINCFLAGS $_DVERFLAGS $_DDEBUGFLAGS $_DFLAGS $_DINTFDIR -c -o $TARGET $SOURCES'
     env['_DINCFLAGS'] = '${_concat(DINCPREFIX, DPATH, DINCSUFFIX, __env__, RDirs, TARGET, SOURCE)}'
     env['_DVERFLAGS'] = '${_concat(DVERPREFIX, DVERSIONS, DVERSUFFIX, __env__)}'
     env['_DDEBUGFLAGS'] = '${_concat(DDEBUGPREFIX, DDEBUG, DDEBUGSUFFIX, __env__)}'
+    env['_DINTFDIR'] = '${_concat(DINTFDIRPREFIX, DINTFDIR, DINTFDIRSUFFIX, __env__, RDirs)}'
     env['_DFLAGS'] = '${_concat(DFLAGPREFIX, DFLAGS, DFLAGSUFFIX, __env__)}'
 
     env['SHDC'] = '$DC'
@@ -92,6 +100,8 @@ def generate(env):
     env['DFLAGPREFIX'] = '-'
     env['DFLAGSUFFIX'] = ''
     env['DFILESUFFIX'] = '.d'
+    env['DINTFDIRPREFIX'] = '-fintfc-dir='
+    env['DINTFDIRSUFFIX'] = ''
 
     env['DLINK'] = '$DC'
     env['DLINKFLAGS'] = SCons.Util.CLVar('')
