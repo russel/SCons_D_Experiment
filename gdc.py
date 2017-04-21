@@ -56,13 +56,23 @@ import SCons.Tool
 import os.path
 import DCommon
 
-def DStaticObjectEmitter(target,source,env):
-    target,source = SCons.Defaults.StaticObjectEmitter(target,source,env)
+def DObjectEmitter(target,source,env):
+    lenDSuffix = len(env["DFILESUFFIX"])
+    diSuffix = env["DIFILESUFFIX"]
     if "DINTFDIR" in env:
         for s in source:
-            target.append(env["DINTFDIR"][0] + "/" + os.path.split(str(s))[1][:-2] + ".di")
+            sourceBase, sourceName = os.path.split(SCons.Util.to_String(s))
+            target.append(env["DINTFDIR"][0] + "/" + sourceName[:-lenDSuffix] + diSuffix)
     return (target,source)
 
+def DStaticObjectEmitter(target,source,env):
+    target,source = SCons.Defaults.StaticObjectEmitter(target,source,env)
+    return DObjectEmitter(target,source,env)
+
+
+def DSharedObjectEmitter(target,source,env):
+    target,source = SCons.Defaults.SharedObjectEmitter(target,source,env)
+    return DObjectEmitter(target,source,env)
 
 def generate(env):
     static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
@@ -100,6 +110,7 @@ def generate(env):
     env['DFLAGPREFIX'] = '-'
     env['DFLAGSUFFIX'] = ''
     env['DFILESUFFIX'] = '.d'
+    env['DIFILESUFFIX'] = '.di'
     env['DINTFDIRPREFIX'] = '-fintfc-dir='
     env['DINTFDIRSUFFIX'] = ''
 
