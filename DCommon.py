@@ -33,7 +33,8 @@ Coded by Russel Winder (russel@winder.org.uk)
 __revision__ = "__FILE__ __REVISION__ __DATE__ __DEVELOPER__"
 
 import os.path
-
+import SCons.Defaults
+import SCons.Util
 
 def isD(env, source):
     if not source:
@@ -60,6 +61,23 @@ def allAtOnceEmitter(target, source, env):
         env.Clean(str(target[0]), str(target[0]) + '.o')
     return target, source
 
+def DObjectEmitter(target,source,env):
+    lenDSuffix = len(env["DFILESUFFIX"])
+    diSuffix = env["DIFILESUFFIX"]
+    if "DINTFDIR" in env:
+        for s in source:
+            sourceBase, sourceName = os.path.split(SCons.Util.to_String(s))
+            target.append(env["DINTFDIR"][0] + "/" + sourceName[:-lenDSuffix] + diSuffix)
+    return (target,source)
+
+def DStaticObjectEmitter(target,source,env):
+    target,source = SCons.Defaults.StaticObjectEmitter(target,source,env)
+    return DObjectEmitter(target,source,env)
+
+
+def DSharedObjectEmitter(target,source,env):
+    target,source = SCons.Defaults.SharedObjectEmitter(target,source,env)
+    return DObjectEmitter(target,source,env)
 
 # Local Variables:
 # tab-width:4

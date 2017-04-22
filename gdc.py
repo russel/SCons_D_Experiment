@@ -53,34 +53,15 @@ __revision__ = "__FILE__ __REVISION__ __DATE__ __DEVELOPER__"
 import SCons.Action
 import SCons.Defaults
 import SCons.Tool
-import os.path
 import DCommon
-
-def DObjectEmitter(target,source,env):
-    lenDSuffix = len(env["DFILESUFFIX"])
-    diSuffix = env["DIFILESUFFIX"]
-    if "DINTFDIR" in env:
-        for s in source:
-            sourceBase, sourceName = os.path.split(SCons.Util.to_String(s))
-            target.append(env["DINTFDIR"][0] + "/" + sourceName[:-lenDSuffix] + diSuffix)
-    return (target,source)
-
-def DStaticObjectEmitter(target,source,env):
-    target,source = SCons.Defaults.StaticObjectEmitter(target,source,env)
-    return DObjectEmitter(target,source,env)
-
-
-def DSharedObjectEmitter(target,source,env):
-    target,source = SCons.Defaults.SharedObjectEmitter(target,source,env)
-    return DObjectEmitter(target,source,env)
 
 def generate(env):
     static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
 
     static_obj.add_action('.d', SCons.Defaults.DAction)
     shared_obj.add_action('.d', SCons.Defaults.ShDAction)
-    static_obj.add_emitter('.d', DStaticObjectEmitter)
-    shared_obj.add_emitter('.d', SCons.Defaults.SharedObjectEmitter)
+    static_obj.add_emitter('.d', DCommon.DStaticObjectEmitter)
+    shared_obj.add_emitter('.d', DCommon.DSharedObjectEmitter)
 
     env['DC'] = env.Detect('gdc')
     env['DCOM'] = '$DC $_DINCFLAGS $_DVERFLAGS $_DDEBUGFLAGS $_DFLAGS $_DINTFDIR -c -o $TARGET $SOURCES'
@@ -91,7 +72,7 @@ def generate(env):
     env['_DFLAGS'] = '${_concat(DFLAGPREFIX, DFLAGS, DFLAGSUFFIX, __env__)}'
 
     env['SHDC'] = '$DC'
-    env['SHDCOM'] = '$SHDC $_DINCFLAGS $_DVERFLAGS $_DDEBUGFLAGS $_DFLAGS -fPIC -c -o $TARGET $SOURCES'
+    env['SHDCOM'] = '$SHDC $_DINCFLAGS $_DVERFLAGS $_DDEBUGFLAGS $_DFLAGS $_DINTFDIR -fPIC -c -o $TARGET $SOURCES'
 
     env['DPATH'] = ['#/']
     env['DFLAGS'] = []
@@ -103,9 +84,9 @@ def generate(env):
 
     env['DINCPREFIX'] = '-I'
     env['DINCSUFFIX'] = ''
-    env['DVERPREFIX'] = '-version='
+    env['DVERPREFIX'] = '-fversion='
     env['DVERSUFFIX'] = ''
-    env['DDEBUGPREFIX'] = '-debug='
+    env['DDEBUGPREFIX'] = '-fdebug='
     env['DDEBUGSUFFIX'] = ''
     env['DFLAGPREFIX'] = '-'
     env['DFLAGSUFFIX'] = ''
