@@ -61,13 +61,22 @@ def allAtOnceEmitter(target, source, env):
         env.Clean(str(target[0]), str(target[0]) + '.o')
     return target, source
 
+def _optWithIxes(pre,x,suf,env,f=lambda x: x, target=None, source=None):
+# a single optional argument version of _concat
+#    print ("_optWithIxes",str(target),str(source))
+    if x in env:
+        l = f(SCons.PathList.PathList([env[x]]).subst_path(env, target, source))
+        return pre + str(l[0]) + suf
+    else:
+        return ""
+
 def DObjectEmitter(target,source,env):
-    lenDSuffix = len(env["DFILESUFFIX"])
-    diSuffix = env["DIFILESUFFIX"]
     if "DINTFDIR" in env:
-        for s in source:
-            sourceBase, sourceName = os.path.split(SCons.Util.to_String(s))
-            target.append(env["DINTFDIR"][0] + "/" + sourceName[:-lenDSuffix] + diSuffix)
+        if (len(target) != 1):
+            raise Exception("expect only one object target")
+        targetBase, targetName = os.path.split(SCons.Util.to_String(target[0]))
+        extraTarget = os.path.join(targetBase,str(env["DINTFDIR"]),targetName[:-len(env["OBJSUFFIX"])] + env["DIFILESUFFIX"])
+        target.append(extraTarget)
     return (target,source)
 
 def DStaticObjectEmitter(target,source,env):
