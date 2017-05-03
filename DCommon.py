@@ -34,7 +34,8 @@ Coded by Russel Winder (russel@winder.org.uk)
 __revision__ = "__FILE__ __REVISION__ __DATE__ __DEVELOPER__"
 
 import os.path
-
+import SCons.Defaults
+import SCons.Util
 
 def isD(env, source):
     if not source:
@@ -61,6 +62,32 @@ def allAtOnceEmitter(target, source, env):
         env.Clean(target[0], str(target[0]) + '.o')
     return target, source
 
+def _optWithIxes(pre,x,suf,env,f=lambda x: x, target=None, source=None):
+# a single optional argument version of _concat
+#    print ("_optWithIxes",str(target),str(source))
+    if x in env:
+        l = f(SCons.PathList.PathList([env[x]]).subst_path(env, target, source))
+        return pre + str(l[0]) + suf
+    else:
+        return ""
+
+def DObjectEmitter(target,source,env):
+    if "DINTFDIR" in env:
+        if (len(target) != 1):
+            raise Exception("expect only one object target")
+        targetBase, targetName = os.path.split(SCons.Util.to_String(target[0]))
+        extraTarget = os.path.join(targetBase,str(env["DINTFDIR"]),targetName[:-len(env["OBJSUFFIX"])] + env["DIFILESUFFIX"])
+        target.append(extraTarget)
+    return (target,source)
+
+def DStaticObjectEmitter(target,source,env):
+    target,source = SCons.Defaults.StaticObjectEmitter(target,source,env)
+    return DObjectEmitter(target,source,env)
+
+
+def DSharedObjectEmitter(target,source,env):
+    target,source = SCons.Defaults.SharedObjectEmitter(target,source,env)
+    return DObjectEmitter(target,source,env)
 
 # Local Variables:
 # tab-width:4
