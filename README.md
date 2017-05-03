@@ -6,11 +6,11 @@ This is really a playground for trying out idea for extending the SCons tools.
 
 ## Installation
 
+### Linux, UNIX, and MacOS
+
 The canonical way of "installing" this currently is to clone this repository and then put symbolic links to
 the dmd.py, ldc.py, gdc.py, and DCommon files of the repository in ~/.scons/site\_scons/site\_tools
 directory.
-
-### Linux, UNIX, and MacOS
 
 A pair of scripts are in the repository to "automate" the installation and un-installation: setup.sh and
 teardown.sh. Clone this repository and run setup.sh and it should do the right thing so tools in this
