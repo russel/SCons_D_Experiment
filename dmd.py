@@ -80,7 +80,7 @@ def generate(env):
     env['_DINCFLAGS'] = '${_concat(DINCPREFIX, DPATH, DINCSUFFIX, __env__, Dirs, TARGET, SOURCE)}'
     env['_DVERFLAGS'] = '${_concat(DVERPREFIX, DVERSIONS, DVERSUFFIX, __env__)}'
     env['_DDEBUGFLAGS'] = '${_concat(DDEBUGPREFIX, DDEBUG, DDEBUGSUFFIX, __env__)}'
-     env['_DINTFDIR'] = '${_optWithIxes(DINTFDIRPREFIX, DINTFDIRKEY, DINTFDIRSUFFIX, __env__, Dirs, TARGET, SOURCE)}'
+    env['_DINTFDIR'] = '${_optWithIxes(DINTFDIRPREFIX, DINTFDIRKEY, DINTFDIRSUFFIX, __env__, Dirs, TARGET, SOURCE)}'
     env['_optWithIxes'] = DCommon._optWithIxes
     env['_DFLAGS'] = '${_concat(DFLAGPREFIX, DFLAGS, DFLAGSUFFIX, __env__)}'
 
