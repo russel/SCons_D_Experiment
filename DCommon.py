@@ -7,6 +7,7 @@ Common code for the various D tools.
 Coded by Russel Winder (russel@winder.org.uk)
 2012-09-06
 """
+
 #
 # __COPYRIGHT__
 #
@@ -57,8 +58,8 @@ def addDPATHToEnv(env, executable):
 
 def allAtOnceEmitter(target, source, env):
     if env['DC'] in ('ldc2', 'dmd'):
-        env.SideEffect(str(target[0]) + '.o', str(target[0]))
-        env.Clean(str(target[0]), str(target[0]) + '.o')
+        env.SideEffect(str(target[0]) + '.o', target[0])
+        env.Clean(target[0], str(target[0]) + '.o')
     return target, source
 
 def _optWithIxes(pre,x,suf,env,f=lambda x: x, target=None, source=None):
