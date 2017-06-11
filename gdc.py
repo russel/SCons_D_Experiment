@@ -75,6 +75,8 @@ def generate(env):
     env['SHDC'] = '$DC'
     env['SHDCOM'] = '$SHDC $_DINCFLAGS $_DVERFLAGS $_DDEBUGFLAGS $_DFLAGS -fPIC -c -o $TARGET $SOURCES'
 
+    env['SHOBJSUFFIX'] = '.o'
+
     env['DPATH'] = ['#/']
     env['DFLAGS'] = []
     env['DVERSIONS'] = []
