@@ -80,7 +80,7 @@ def generate(env):
     env['SHDC'] = '$DC'
     env['SHDCOM'] = '$DC $_DINCFLAGS $_DVERFLAGS $_DDEBUGFLAGS $_DFLAGS -c -relocation-model=pic -of=$TARGET $SOURCES'
 
-    env['SHOBJSUFFIX'] = '.o'
+    env['SHOBJSUFFIX'] = '$OBJSUFFIX'
 
     env['DPATH'] = ['#/']
     env['DFLAGS'] = []
