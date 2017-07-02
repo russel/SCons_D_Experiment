@@ -8,6 +8,13 @@ Developed by Russel Winder (russel@winder.org.uk)
 2017-04-13 onwards.
 """
 
+import os
+import subprocess
+
+import SCons.Builder
+import SCons.Node
+import SCons.Errors
+
 #
 # __COPYRIGHT__
 #
@@ -33,12 +40,47 @@ Developed by Russel Winder (russel@winder.org.uk)
 
 __revision__ = "__FILE__ __REVISION__ __DATE__ __DEVELOPER__"
 
-import os
-import subprocess
 
-import SCons.Builder
-import SCons.Node
-import SCons.Errors
+def _check_correct_calling(target, source):
+    if len(target) != 1:
+        SCons.Errors.StopError('Incorrect number of targets.')
+    if len(source) != 0:
+        SCons.Errors.StopError('Incorrect number of sources')
+
+
+def _do_nothing(target, source, env):
+    _check_correct_calling()
+
+
+def _do_nothing_print_message(*args):
+    pass  # print(args)
+
+
+def _unit_threaded_special_processing(env):
+    def reassign_target(target, source, env):
+        _check_correct_calling(target, source)
+        return [env.File(source[0].name)], [source[0].dir.srcnode()]
+
+    def make_main(target, source, env):
+        _check_correct_calling(target, source)
+        modules = tuple(f for f in os.listdir(str(source[0])) if f.endswith('.d'))
+        opening = """//Automatically generated do not edit by hand.
+import unit_threaded;
+int main(string[] args) {
+    return args.runTests!(
+"""
+        closing = """    );
+}
+"""
+    with open(str(target[0]), 'w') as f:
+        f.write(opening + ''.join(tuple('"{}",\n'.format(m.replace('.d', '')) for m in modules)) + closing)
+
+    env['BUILDERS']['UnitThreadedMakeMain'] = SCons.Builder.Builder(
+        action=make_main,
+        emitter=reassign_target,
+        single_source=True,
+        PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
+    )
 
 
 class _Library(SCons.Node.FS.File):
@@ -95,37 +137,7 @@ class _Library(SCons.Node.FS.File):
         env.NoClean(path_to_library)
 
         if name == 'unit-threaded':
-
-            def reassign_target(target, source, env):
-                if len(target) != 1:
-                    SCons.Errors.StopError('Incorrect number of targets.')
-                if len(source) != 1:
-                    SCons.Errors.StopError('Incorrect number of sources')
-                return [env.File(source[0].name)], [source[0].dir.srcnode()]
-
-            def make_main(target, source, env):
-                if len(target) != 1:
-                    SCons.Errors.StopError('Incorrect number of targets.')
-                if len(source) != 0:
-                    SCons.Errors.StopError('Incorrect number of sources')
-                modules = tuple(f for f in os.listdir(str(source[0])) if f.endswith('.d'))
-                opening = """//Automatically generated do not edit by hand.
-import unit_threaded;
-int main(string[] args) {
-    return args.runTests!(
-"""
-                closing = """    );
-}
-"""
-                with open(str(target[0]), 'w') as f:
-                    f.write(opening + ''.join(tuple('"{}",\n'.format(m.replace('.d', '')) for m in modules)) + closing)
-
-            env['BUILDERS']['UnitThreadedMakeMain'] = SCons.Builder.Builder(
-                action=make_main,
-                emitter=reassign_target,
-                single_source=True,
-                PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
-            )
+            _unit_threaded_special_processing(env)
 
         compiled_library_directory = os.path.join(build_directory, selected_versions[0])
         self.library_file = os.path.join(compiled_library_directory, 'lib' + name + '.a')
@@ -135,22 +147,8 @@ int main(string[] args) {
         SCons.Node.FS.File.__init__(self, name, env.Dir(compiled_library_directory), self)
 
 
-def _do_nothing(target, source, env):
-    if len(target) != 1:
-        SCons.Errors.StopError('Incorrect number of targets.')
-    if len(source) != 0:
-        SCons.Errors.StopError('Incorrect number of sources')
-
-
-def _do_nothing_print_message(*args):
-    pass  # print(args)
-
-
 def _ensure_library_present_and_amend_target_path(target, source, env):
-    if len(target) != 1:
-        SCons.Errors.StopError('Incorrect number of targets.')
-    if len(source) != 1:
-        SCons.Errors.StopError('Incorrect number of sources')
+    _check_correct_calling()
     library = _Library(env, target[0].name, source[0].value)
     if 'library_' + library.key_name in env:
         print('Library {} already found'.format(library.key_name))
@@ -160,7 +158,7 @@ def _ensure_library_present_and_amend_target_path(target, source, env):
 
 
 def generate(env):
-    env['DUB'] = env.Detect('dub')
+    env['DUB'] = env.Detect('dub') or 'dub'
     env['LIBRARIES'] = {}
     env['BUILDERS']['AddDubLibrary'] = SCons.Builder.Builder(
         action=_do_nothing,
