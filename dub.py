@@ -4,6 +4,14 @@ from __future__ import print_function
 
 A tool for integrating use of Dub with ldc, dmd, and gdc tools.
 
+Dub is a tool for managing downloading from the Dub repository and building
+dependent packages. It can also then build the application or library that is
+the project. Here though project building is ignored, that is what SCons is
+doing, Dub is just used to create compiled libraries to be linked to.
+
+Dub always generates archive files for static linking, it cannot generate
+shared objects or dynamic link libraries.
+
 Developed by Russel Winder (russel@winder.org.uk)
 2017-04-13 onwards.
 """
@@ -49,21 +57,21 @@ def _check_correct_calling(target, source):
 
 
 def _do_nothing(target, source, env):
-    _check_correct_calling()
+    _check_correct_calling(target, source)
 
 
-def _do_nothing_print_message(*args):
-    pass  # print(args)
+# def _do_nothing_print_message(*args):
+#     pass  # print(args)
 
 
 def _unit_threaded_special_processing(env):
     def reassign_target(target, source, env):
         _check_correct_calling(target, source)
-        return [env.File(source[0].name)], [source[0].dir.srcnode()]
+        return [env.File(source[0].abspath)], []
 
     def make_main(target, source, env):
         _check_correct_calling(target, source)
-        modules = tuple(f for f in os.listdir(str(source[0])) if f.endswith('.d'))
+        modules = tuple(f for f in os.listdir('source') if f.endswith('.d') and f != target[0].name)  # TODO This is by no means good enough.
         opening = """//Automatically generated do not edit by hand.
 import unit_threaded;
 int main(string[] args) {
@@ -72,14 +80,14 @@ int main(string[] args) {
         closing = """    );
 }
 """
-    with open(str(target[0]), 'w') as f:
-        f.write(opening + ''.join(tuple('"{}",\n'.format(m.replace('.d', '')) for m in modules)) + closing)
+        with open(str(target[0]), 'w') as f:
+            f.write(opening + ''.join(tuple('"{}",\n'.format(m.replace('.d', '')) for m in modules)) + closing)
 
     env['BUILDERS']['UnitThreadedMakeMain'] = SCons.Builder.Builder(
         action=make_main,
         emitter=reassign_target,
         single_source=True,
-        PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
+        # PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
     )
 
 
@@ -105,7 +113,9 @@ class _Library(SCons.Node.FS.File):
                     raise SCons.Errors.StopError('Something weird happened. ' + stderr)
 
         def collect_library_versions():
-            return [f for f in os.listdir(build_directory) if f.startswith('library-debug-linux.posix-x86_64-' + ('ldc' if self.compiler == 'ldc2' else self.compiler))]
+            name, _, _, _, architecture = os.uname()
+            name = name.lower()
+            return [f for f in os.listdir(build_directory) if f.startswith('library-debug-{}.{}-{}-{}'.format(name, env['PLATFORM'], architecture, 'ldc' if self.compiler == 'ldc2' else self.compiler))]
 
         def compile_library():
             print('Compiling fetched', name)
@@ -148,7 +158,7 @@ class _Library(SCons.Node.FS.File):
 
 
 def _ensure_library_present_and_amend_target_path(target, source, env):
-    _check_correct_calling()
+    _check_correct_calling(target, source)
     library = _Library(env, target[0].name, source[0].value)
     if 'library_' + library.key_name in env:
         print('Library {} already found'.format(library.key_name))
@@ -166,7 +176,7 @@ def generate(env):
         target_factory=SCons.Node.FS.File,
         source_factory=SCons.Node.Python.Value,
         single_source=True,
-        PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
+        # PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
     )
 
 
