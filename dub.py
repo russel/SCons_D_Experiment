@@ -49,11 +49,9 @@ import SCons.Errors
 __revision__ = "__FILE__ __REVISION__ __DATE__ __DEVELOPER__"
 
 
-def _check_correct_calling(target, source):
+def _check_correct_calling(target):
     if len(target) != 1:
         SCons.Errors.StopError('Incorrect number of targets.')
-    if len(source) != 0:
-        SCons.Errors.StopError('Incorrect number of sources')
 
 
 def _do_nothing(target, source, env):
@@ -65,28 +63,38 @@ def _do_nothing(target, source, env):
 
 
 def _unit_threaded_special_processing(env):
-    def reassign_target(target, source, env):
-        _check_correct_calling(target, source)
-        return [env.File(source[0].abspath)], []
+
+    def ensure_correct_target(target, source, env):
+        if len(target) == 0:
+            return ['build/ut_main.d'], []
+        elif len(target) == 1:
+            if len(source) == 1:
+                if source[0].path == target[0].path + '.d':
+                    return [source[0]], []
+            return target, source
+        return None, None
 
     def make_main(target, source, env):
-        _check_correct_calling(target, source)
-        modules = tuple(f for f in os.listdir('source') if f.endswith('.d') and f != target[0].name)  # TODO This is by no means good enough.
-        opening = """//Automatically generated do not edit by hand.
+        _check_correct_calling(target)
+        modules = []
+        if len(source) == 0:
+            modules = tuple(f for f in os.listdir('source') if f.endswith('.d') and f != target[0].name)  # TODO What about sub-packages?
+        else:
+            modules = tuple(f.name for f in source)
+        module_list_string = ''.join(tuple('"{}",\n'.format(m.replace('.d', '')) for m in modules))
+        with open(str(target[0]), 'w') as f:
+            f.write("""//Automatically generated do not edit by hand.
 import unit_threaded;
 int main(string[] args) {
     return args.runTests!(
-"""
-        closing = """    );
+""" + ',\n'.join(tuple('"{}"'.format(m.replace('.d', '')) for m in modules)) + """
+    );
 }
-"""
-        with open(str(target[0]), 'w') as f:
-            f.write(opening + ''.join(tuple('"{}",\n'.format(m.replace('.d', '')) for m in modules)) + closing)
+""")
 
     env['BUILDERS']['UnitThreadedMakeMain'] = SCons.Builder.Builder(
         action=make_main,
-        emitter=reassign_target,
-        single_source=True,
+        emitter=ensure_correct_target,
         # PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
     )
 
@@ -158,7 +166,7 @@ class _Library(SCons.Node.FS.File):
 
 
 def _ensure_library_present_and_amend_target_path(target, source, env):
-    _check_correct_calling(target, source)
+    _check_correct_calling(target)
     library = _Library(env, target[0].name, source[0].value)
     if 'library_' + library.key_name in env:
         print('Library {} already found'.format(library.key_name))
