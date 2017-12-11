@@ -4,9 +4,24 @@ from __future__ import print_function
 
 A tool for integrating use of Dub with ldc, dmd, and gdc tools.
 
+Dub is a tool for managing downloading from the Dub repository and building
+dependent packages. It can also then build the application or library that is
+the project. Here though project building is ignored, that is what SCons is
+doing, Dub is just used to create compiled libraries to be linked to.
+
+Dub always generates archive files for static linking, it cannot generate
+shared objects or dynamic link libraries.
+
 Developed by Russel Winder (russel@winder.org.uk)
 2017-04-13 onwards.
 """
+
+import os
+import subprocess
+
+import SCons.Builder
+import SCons.Node
+import SCons.Errors
 
 #
 # __COPYRIGHT__
@@ -33,12 +48,55 @@ Developed by Russel Winder (russel@winder.org.uk)
 
 __revision__ = "__FILE__ __REVISION__ __DATE__ __DEVELOPER__"
 
-import os
-import subprocess
 
-import SCons.Builder
-import SCons.Node
-import SCons.Errors
+def _check_correct_calling(target):
+    if len(target) != 1:
+        SCons.Errors.StopError('Incorrect number of targets.')
+
+
+def _do_nothing(target, source, env):
+    _check_correct_calling(target, source)
+
+
+# def _do_nothing_print_message(*args):
+#     pass  # print(args)
+
+
+def _unit_threaded_special_processing(env):
+
+    def ensure_correct_target(target, source, env):
+        if len(target) == 0:
+            return ['build/ut_main.d'], []
+        elif len(target) == 1:
+            if len(source) == 1:
+                if source[0].path == target[0].path + '.d':
+                    return [source[0]], []
+            return target, source
+        return None, None
+
+    def make_main(target, source, env):
+        _check_correct_calling(target)
+        modules = []
+        if len(source) == 0:
+            modules = tuple(f for f in os.listdir('source') if f.endswith('.d') and f != target[0].name)  # TODO What about sub-packages?
+        else:
+            modules = tuple(f.name for f in source)
+        module_list_string = ''.join(tuple('"{}",\n'.format(m.replace('.d', '')) for m in modules))
+        with open(str(target[0]), 'w') as f:
+            f.write("""//Automatically generated do not edit by hand.
+import unit_threaded;
+int main(string[] args) {
+    return args.runTests!(
+""" + ',\n'.join(tuple('"{}"'.format(m.replace('.d', '')) for m in modules)) + """
+    );
+}
+""")
+
+    env['BUILDERS']['UnitThreadedMakeMain'] = SCons.Builder.Builder(
+        action=make_main,
+        emitter=ensure_correct_target,
+        # PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
+    )
 
 
 class _Library(SCons.Node.FS.File):
@@ -63,7 +121,9 @@ class _Library(SCons.Node.FS.File):
                     raise SCons.Errors.StopError('Something weird happened. ' + stderr)
 
         def collect_library_versions():
-            return [f for f in os.listdir(build_directory) if f.startswith('library-debug-linux.posix-x86_64-' + ('ldc' if self.compiler == 'ldc2' else self.compiler))]
+            name, _, _, _, architecture = os.uname()
+            name = name.lower()
+            return [f for f in os.listdir(build_directory) if f.startswith('library-debug-{}.{}-{}-{}'.format(name, env['PLATFORM'], architecture, 'ldc' if self.compiler == 'ldc2' else self.compiler))]
 
         def compile_library():
             print('Compiling fetched', name)
@@ -95,37 +155,7 @@ class _Library(SCons.Node.FS.File):
         env.NoClean(path_to_library)
 
         if name == 'unit-threaded':
-
-            def reassign_target(target, source, env):
-                if len(target) != 1:
-                    SCons.Errors.StopError('Incorrect number of targets.')
-                if len(source) != 1:
-                    SCons.Errors.StopError('Incorrect number of sources')
-                return [env.File(source[0].name)], [source[0].dir.srcnode()]
-
-            def make_main(target, source, env):
-                if len(target) != 1:
-                    SCons.Errors.StopError('Incorrect number of targets.')
-                if len(source) != 0:
-                    SCons.Errors.StopError('Incorrect number of sources')
-                modules = tuple(f for f in os.listdir(str(source[0])) if f.endswith('.d'))
-                opening = """//Automatically generated do not edit by hand.
-import unit_threaded;
-int main(string[] args) {
-    return args.runTests!(
-"""
-                closing = """    );
-}
-"""
-                with open(str(target[0]), 'w') as f:
-                    f.write(opening + ''.join(tuple('"{}",\n'.format(m.replace('.d', '')) for m in modules)) + closing)
-
-            env['BUILDERS']['UnitThreadedMakeMain'] = SCons.Builder.Builder(
-                action=make_main,
-                emitter=reassign_target,
-                single_source=True,
-                PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
-            )
+            _unit_threaded_special_processing(env)
 
         compiled_library_directory = os.path.join(build_directory, selected_versions[0])
         self.library_file = os.path.join(compiled_library_directory, 'lib' + name + '.a')
@@ -135,22 +165,8 @@ int main(string[] args) {
         SCons.Node.FS.File.__init__(self, name, env.Dir(compiled_library_directory), self)
 
 
-def _do_nothing(target, source, env):
-    if len(target) != 1:
-        SCons.Errors.StopError('Incorrect number of targets.')
-    if len(source) != 0:
-        SCons.Errors.StopError('Incorrect number of sources')
-
-
-def _do_nothing_print_message(*args):
-    pass  # print(args)
-
-
 def _ensure_library_present_and_amend_target_path(target, source, env):
-    if len(target) != 1:
-        SCons.Errors.StopError('Incorrect number of targets.')
-    if len(source) != 1:
-        SCons.Errors.StopError('Incorrect number of sources')
+    _check_correct_calling(target)
     library = _Library(env, target[0].name, source[0].value)
     if 'library_' + library.key_name in env:
         print('Library {} already found'.format(library.key_name))
@@ -160,7 +176,7 @@ def _ensure_library_present_and_amend_target_path(target, source, env):
 
 
 def generate(env):
-    env['DUB'] = env.Detect('dub')
+    env['DUB'] = env.Detect('dub') or 'dub'
     env['LIBRARIES'] = {}
     env['BUILDERS']['AddDubLibrary'] = SCons.Builder.Builder(
         action=_do_nothing,
@@ -168,7 +184,7 @@ def generate(env):
         target_factory=SCons.Node.FS.File,
         source_factory=SCons.Node.Python.Value,
         single_source=True,
-        PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
+        # PRINT_CMD_LINE_FUNC=_do_nothing_print_message,
     )
 
 

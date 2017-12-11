@@ -63,7 +63,7 @@ def generate(env):
     static_obj.add_emitter('.d', DCommon.DStaticObjectEmitter)
     shared_obj.add_emitter('.d', DCommon.DSharedObjectEmitter)
 
-    env['DC'] = env.Detect('gdc')
+    env['DC'] = env.Detect('gdc') or 'gdc'
     env['DCOM'] = '$DC $_DINCFLAGS $_DVERFLAGS $_DDEBUGFLAGS $_DFLAGS $_DINTFDIR -c -o $TARGET $SOURCES'
     env['_DINCFLAGS'] = '${_concat(DINCPREFIX, DPATH, DINCSUFFIX, __env__, Dirs, TARGET, SOURCE)}'
     env['_DVERFLAGS'] = '${_concat(DVERPREFIX, DVERSIONS, DVERSUFFIX, __env__)}'
@@ -101,9 +101,9 @@ def generate(env):
     env['DLINKFLAGS'] = SCons.Util.CLVar('')
     env['DLINKCOM'] = '$DLINK -o $TARGET $DLINKFLAGS $__RPATH $SOURCES $_LIBDIRFLAGS $_LIBFLAGS'
 
-    env['DSHLINK'] = '$DC'
-    env['DSHLINKFLAGS'] = SCons.Util.CLVar('$DLINKFLAGS -shared -shared-libphobos')
-    env['SHDLINKCOM'] = '$DLINK -o $TARGET $DSHLINKFLAGS $__DSHLIBVERSIONFLAGS $__RPATH $SOURCES $_LIBDIRFLAGS $_LIBFLAGS'
+    env['SHDLINK'] = '$DC'
+    env['SHDLINKFLAGS'] = SCons.Util.CLVar('$DLINKFLAGS -shared -shared-libphobos')
+    env['SHDLINKCOM'] = '$DLINK -o $TARGET $SHDLINKFLAGS $__SHDLIBVERSIONFLAGS $__RPATH $SOURCES $_LIBDIRFLAGS $_LIBFLAGS'
 
     env['DLIB'] = 'lib' if env['PLATFORM'] == 'win32' else 'ar cr'
     env['DLIBCOM'] = '$DLIB $_DLIBFLAGS {0}$TARGET $SOURCES $_DLINKLIBFLAGS'.format('-c ' if env['PLATFORM'] == 'win32' else '')
@@ -122,17 +122,15 @@ def generate(env):
     env['_RPATH'] = '${_concat(RPATHPREFIX, RPATH, RPATHSUFFIX, __env__)}'
 
     # Support for versioned libraries
-    env['_DSHLIBVERSIONFLAGS'] = '$DSHLIBVERSIONFLAGS -Wl,-soname=$_DSHLIBSONAME'
-    env['_DSHLIBSONAME'] = '${DShLibSonameGenerator(__env__,TARGET)}'
+    env['_SHDLIBVERSIONFLAGS'] = '$SHDLIBVERSIONFLAGS -Wl,-soname=$_SHDLIBSONAME'
+    env['_SHDLIBSONAME'] = '${DShLibSonameGenerator(__env__,TARGET)}'
     # NOTE: this is a quick hack, the soname will only work if there is
     # c/c++ linker loaded which provides callback for the ShLibSonameGenerator
     env['DShLibSonameGenerator'] = SCons.Tool.ShLibSonameGenerator
-    # NOTE: this is only for further reference, currently $DSHLIBVERSION does
+    # NOTE: this is only for further reference, currently $SHDLIBVERSION does
     # not work, the user must use $SHLIBVERSION
-    env['DSHLIBVERSION'] = '$SHLIBVERSION'
-    env['DSHLIBVERSIONFLAGS'] = '$SHLIBVERSIONFLAGS'
-
-    SCons.Tool.createStaticLibBuilder(env)
+    env['SHDLIBVERSION'] = '$SHLIBVERSION'
+    env['SHDLIBVERSIONFLAGS'] = '$SHLIBVERSIONFLAGS'
 
     env['BUILDERS']['ProgramAllAtOnce'] = SCons.Builder.Builder(
         action='$DC $_DINCFLAGS $_DVERFLAGS $_DDEBUGFLAGS $_DFLAGS -o $TARGET $DLINKFLAGS $__DRPATH $SOURCES $_DLIBDIRFLAGS $_DLIBFLAGS',
