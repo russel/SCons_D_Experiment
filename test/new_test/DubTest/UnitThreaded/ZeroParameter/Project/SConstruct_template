@@ -1,0 +1,10 @@
+# -*- mode:python; coding:utf-8; -*-
+
+import os
+
+environment = Environment(
+    tools=['dub', '{}', 'link'])
+
+testEnvironment = environment.Clone()
+testEnvironment.AddDubLibrary('unit-threaded', '0.7.32')
+testEnvironment.UnitThreadedMakeMain()
